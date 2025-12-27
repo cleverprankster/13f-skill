@@ -1,0 +1,39 @@
+# Pre-configured funds for 13F Analysis
+# Add more funds with: 13f add-fund --name "Fund Name" --cik "0001234567"
+# Find CIK numbers at: https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany
+
+funds:
+  - display_name: Coatue Management
+    cik: "0001135730"
+    tags:
+      - tiger-cub
+      - tech
+
+  - display_name: Altimeter Capital
+    cik: "0001541617"
+    tags:
+      - tech
+      - growth
+
+  - display_name: Appaloosa Management
+    cik: "0001656456"
+    tags:
+      - macro
+      - distressed
+
+  - display_name: Tiger Global
+    cik: "0001167483"
+    tags:
+      - tiger-cub
+      - tech
+
+  - display_name: Strategy Capital
+    cik: "0001592413"
+    tags:
+      - tech
+
+  - display_name: Atreides Management
+    cik: "0001777813"
+    tags:
+      - tiger-cub
+      - tech

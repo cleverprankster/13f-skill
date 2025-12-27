@@ -32,7 +32,17 @@ SEC EDGAR requires a contact email in the User-Agent header:
 export SEC_CONTACT_EMAIL=your@email.com
 ```
 
-### 3. Install the Claude Code skill (optional)
+### 3. Verify installation
+
+```bash
+# Check CLI is installed
+13f --version
+
+# List pre-configured funds
+13f list-funds
+```
+
+### 4. Install the Claude Code skill (optional)
 
 To use natural language commands with Claude Code:
 
@@ -122,6 +132,8 @@ Or use CLI syntax directly:
 
 ## Pre-configured Funds
 
+The following funds are included by default and ready to use after installation:
+
 | Fund | CIK | Tags |
 |------|-----|------|
 | Coatue Management | 0001135730 | tiger-cub, tech |
@@ -130,7 +142,8 @@ Or use CLI syntax directly:
 | Tiger Global | 0001167483 | tiger-cub, tech |
 | Strategy Capital | 0001592413 | tech |
 | Atreides Management | 0001777813 | tiger-cub, tech |
-| Situational Awareness | 0002045724 | — |
+
+Add more funds with `13f add-fund --name "Fund Name" --cik "0001234567"`
 
 ## Command Examples
 
@@ -312,6 +325,54 @@ pytest
 # Lint
 ruff check src/
 ```
+
+## Troubleshooting
+
+### SEC_CONTACT_EMAIL not set
+
+```
+Error: SEC_CONTACT_EMAIL environment variable is required.
+```
+
+**Fix:** Add to your shell config:
+```bash
+echo 'export SEC_CONTACT_EMAIL=your@email.com' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### No funds configured
+
+```
+No funds configured. Use 'add-fund' to add funds.
+```
+
+**Fix:** The pre-configured funds should auto-install on first run. If not, reinstall:
+```bash
+pip install -e .
+```
+
+### Rate limiting from SEC EDGAR
+
+SEC limits requests to 10/second. The CLI respects this, but if you see rate limit errors:
+- Wait a few minutes before retrying
+- Avoid running multiple pulls simultaneously
+
+### Command not found: 13f
+
+**Fix:** Ensure the package is installed in your active Python environment:
+```bash
+pip install -e .
+```
+
+If using a virtual environment, make sure it's activated.
+
+## Command Patterns
+
+> **Note:** Some commands use positional arguments, others use named options:
+> - `13f stock NVDA` — positional (ticker as argument)
+> - `13f report --fund "Coatue"` — named option
+>
+> When in doubt, use `13f <command> --help` to see the expected format.
 
 ## License
 

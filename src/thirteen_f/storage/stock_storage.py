@@ -1,6 +1,7 @@
 """Stock holdings storage management."""
 
 import json
+import re
 import shutil
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -10,6 +11,43 @@ import yaml
 
 from ..config import Config
 from ..sec.quarterly_data import HoldingRecord
+
+
+def _validate_path_component(value: str, name: str) -> str:
+    """Validate a value is safe to use as a path component.
+
+    Prevents path traversal attacks by rejecting:
+    - Path separators (/, \\)
+    - Parent directory references (..)
+    - Null bytes
+    - Empty strings
+
+    Args:
+        value: The value to validate
+        name: Name of the field for error messages
+
+    Returns:
+        The validated value (uppercase for consistency)
+
+    Raises:
+        ValueError: If the value contains unsafe characters
+    """
+    if not value:
+        raise ValueError(f"{name} cannot be empty")
+
+    # Check for path traversal attempts
+    if '/' in value or '\\' in value:
+        raise ValueError(f"{name} contains invalid path separator")
+    if '..' in value:
+        raise ValueError(f"{name} contains invalid path reference")
+    if '\x00' in value:
+        raise ValueError(f"{name} contains null byte")
+
+    # Only allow alphanumeric, dash, underscore for safety
+    if not re.match(r'^[\w\-]+$', value):
+        raise ValueError(f"{name} contains invalid characters")
+
+    return value.upper()
 
 
 @dataclass
@@ -101,17 +139,19 @@ def add_tracked_stock(
 
     Returns the new TrackedStock object.
     """
+    # Validate ticker for safe path usage
+    safe_ticker = _validate_path_component(ticker, "ticker")
+
     stocks = load_tracked_stocks(config)
 
     # Check if already tracked
-    ticker_upper = ticker.upper()
     for s in stocks:
-        if s.ticker.upper() == ticker_upper:
+        if s.ticker.upper() == safe_ticker:
             raise ValueError(f"{ticker} is already being tracked")
 
     # Create new tracked stock
     stock = TrackedStock(
-        ticker=ticker_upper,
+        ticker=safe_ticker,
         cusip=cusip,
         name=name,
         added_at=datetime.utcnow().isoformat(),
@@ -123,7 +163,7 @@ def add_tracked_stock(
     save_tracked_stocks(config, stocks)
 
     # Create data directory for this stock
-    stock_dir = get_stock_data_dir(config) / ticker_upper
+    stock_dir = get_stock_data_dir(config) / safe_ticker
     stock_dir.mkdir(parents=True, exist_ok=True)
 
     return stock
@@ -134,18 +174,20 @@ def remove_tracked_stock(ticker: str, config: Config) -> int:
 
     Returns the number of bytes freed.
     """
+    # Validate ticker for safe path usage
+    safe_ticker = _validate_path_component(ticker, "ticker")
+
     stocks = load_tracked_stocks(config)
-    ticker_upper = ticker.upper()
 
     # Find and remove the stock
-    new_stocks = [s for s in stocks if s.ticker.upper() != ticker_upper]
+    new_stocks = [s for s in stocks if s.ticker.upper() != safe_ticker]
     if len(new_stocks) == len(stocks):
         raise ValueError(f"{ticker} is not being tracked")
 
     save_tracked_stocks(config, new_stocks)
 
     # Delete data directory
-    stock_dir = get_stock_data_dir(config) / ticker_upper
+    stock_dir = get_stock_data_dir(config) / safe_ticker
     bytes_freed = 0
     if stock_dir.exists():
         bytes_freed = sum(f.stat().st_size for f in stock_dir.rglob("*") if f.is_file())
@@ -156,9 +198,13 @@ def remove_tracked_stock(ticker: str, config: Config) -> int:
 
 def get_stock_holdings_path(ticker: str, quarter: str, config: Config) -> Path:
     """Get path to a stock's holdings JSON file for a quarter."""
-    stock_dir = get_stock_data_dir(config) / ticker.upper()
+    # Validate path components to prevent path traversal
+    safe_ticker = _validate_path_component(ticker, "ticker")
+    safe_quarter = _validate_path_component(quarter, "quarter")
+
+    stock_dir = get_stock_data_dir(config) / safe_ticker
     stock_dir.mkdir(parents=True, exist_ok=True)
-    return stock_dir / f"{quarter}.json"
+    return stock_dir / f"{safe_quarter}.json"
 
 
 def save_stock_holdings(
@@ -232,7 +278,10 @@ def load_stock_holdings(
 
 def get_stock_quarters(ticker: str, config: Config) -> list[str]:
     """Get list of quarters that have data for a stock."""
-    stock_dir = get_stock_data_dir(config) / ticker.upper()
+    # Validate ticker for safe path usage
+    safe_ticker = _validate_path_component(ticker, "ticker")
+
+    stock_dir = get_stock_data_dir(config) / safe_ticker
     if not stock_dir.exists():
         return []
 
@@ -246,7 +295,10 @@ def get_stock_quarters(ticker: str, config: Config) -> list[str]:
 
 def get_stock_storage_bytes(ticker: str, config: Config) -> int:
     """Get total storage used by a stock in bytes."""
-    stock_dir = get_stock_data_dir(config) / ticker.upper()
+    # Validate ticker for safe path usage
+    safe_ticker = _validate_path_component(ticker, "ticker")
+
+    stock_dir = get_stock_data_dir(config) / safe_ticker
     if not stock_dir.exists():
         return 0
 

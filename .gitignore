@@ -1,8 +1,31 @@
+# User data and cache
 data/
 artifacts/
 *.db
+
+# Python
 __pycache__/
 *.egg-info/
 .venv/
 dist/
 build/
+*.pyc
+*.pyo
+
+# Environment files (prevent accidental secret exposure)
+.env
+.env.*
+*.env
+
+# IDE and editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

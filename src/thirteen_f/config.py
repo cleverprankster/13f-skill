@@ -1,6 +1,7 @@
 """Configuration management for 13F Skill."""
 
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -63,8 +64,22 @@ class Fund:
     tags: list[str] = field(default_factory=list)
 
 
+def _ensure_default_funds(config: Config) -> None:
+    """Copy default funds.yaml if user's doesn't exist."""
+    if config.funds_file.exists():
+        return
+
+    # Find the default funds.yaml bundled with the package
+    default_funds = Path(__file__).parent / "default_data" / "funds.yaml"
+    if default_funds.exists():
+        shutil.copy(default_funds, config.funds_file)
+
+
 def load_funds(config: Config) -> list[Fund]:
     """Load funds from the YAML config file."""
+    # Ensure default funds exist on first run
+    _ensure_default_funds(config)
+
     if not config.funds_file.exists():
         return []
 

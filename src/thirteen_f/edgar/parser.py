@@ -94,7 +94,16 @@ def parse_13f_info_table(xml_content: bytes) -> list[Holding]:
     holdings: list[Holding] = []
 
     try:
-        root = etree.fromstring(xml_content)
+        # Use secure parser to prevent XXE attacks
+        # - resolve_entities=False: Don't resolve external entities
+        # - no_network=True: Don't fetch external resources
+        # - dtd_validation=False: Don't process DTD
+        parser = etree.XMLParser(
+            resolve_entities=False,
+            no_network=True,
+            dtd_validation=False,
+        )
+        root = etree.fromstring(xml_content, parser=parser)
     except etree.XMLSyntaxError as e:
         raise ValueError(f"Failed to parse XML: {e}")
 

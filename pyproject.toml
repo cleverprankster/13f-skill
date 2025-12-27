@@ -9,13 +9,13 @@ description = "Deterministic 13F ingestion and analysis tool"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "click>=8.0",
-    "httpx>=0.25",
-    "lxml>=5.0",
-    "pandas>=2.0",
-    "pyarrow>=14.0",
-    "pyyaml>=6.0",
-    "rich>=13.0",
+    "click>=8.0,<9.0",
+    "httpx>=0.25,<1.0",
+    "lxml>=5.0,<7.0",
+    "pandas>=2.0,<3.0",
+    "pyarrow>=14.0.1,<18.0",  # 14.0.1 fixes CVE-2023-47248
+    "pyyaml>=6.0,<7.0",
+    "rich>=13.0,<14.0",
 ]
 
 [project.optional-dependencies]
@@ -25,10 +25,13 @@ dev = [
 ]
 
 [project.scripts]
-13f = "thirteen_f.cli:cli"
+13f = "thirteen_f.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+thirteen_f = ["default_data/*.yaml"]
 
 [tool.ruff]
 line-length = 100

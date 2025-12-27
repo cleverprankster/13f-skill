@@ -11,6 +11,15 @@ import click
 
 from .config import Config, Fund, get_config, load_funds, save_funds
 
+__version__ = "0.1.0"
+
+
+def _get_lazy_config(ctx: click.Context) -> Config:
+    """Get config lazily - only creates it when first accessed."""
+    if "config" not in ctx.obj:
+        ctx.obj["config"] = get_config()
+    return ctx.obj["config"]
+
 
 # =============================================================================
 # Security Helpers
@@ -114,10 +123,16 @@ def sanitize_tag(tag: str) -> str:
 def escape_applescript_string(s: str) -> str:
     """Escape a string for safe use in AppleScript.
 
-    AppleScript escapes quotes by doubling them, not with backslash.
-    Also escape backslashes for safety.
+    AppleScript escapes quotes by using the quote constant.
+    Also escape backslashes and remove control characters for safety.
     """
-    return s.replace('\\', '\\\\').replace('"', '" & quote & "')
+    # Remove/replace control characters that could break the command
+    s = s.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+    s = s.replace('\x00', '')  # Remove null bytes
+    # Escape backslashes and quotes
+    s = s.replace('\\', '\\\\')
+    s = s.replace('"', '" & quote & "')
+    return s
 
 
 from .edgar.client import EdgarClient
@@ -145,11 +160,13 @@ def _print_markdown(content: str) -> None:
 
 
 @click.group()
+@click.version_option(version=__version__, prog_name="13f")
 @click.pass_context
 def cli(ctx: click.Context) -> None:
     """13F Analysis Tool - Deterministic 13F ingestion and analysis."""
     ctx.ensure_object(dict)
-    ctx.obj["config"] = get_config()
+    # Config is now loaded lazily via _get_lazy_config() when needed
+    # This allows --help and --version to work without SEC_CONTACT_EMAIL
 
 
 @cli.command("add-fund")
@@ -159,7 +176,7 @@ def cli(ctx: click.Context) -> None:
 @click.pass_context
 def add_fund(ctx: click.Context, name: str, cik: str, tags: str) -> None:
     """Add a fund to the tracking list."""
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     funds = load_funds(config)
 
     # Sanitize inputs
@@ -197,7 +214,7 @@ def add_fund(ctx: click.Context, name: str, cik: str, tags: str) -> None:
 @click.pass_context
 def remove_fund(ctx: click.Context, name: str) -> None:
     """Remove a fund from the tracking list."""
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     funds = load_funds(config)
 
     original_count = len(funds)
@@ -223,7 +240,7 @@ def list_funds(ctx: click.Context) -> None:
     from rich.console import Console
     from rich.table import Table
 
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     funds = load_funds(config)
 
     if not funds:
@@ -259,7 +276,7 @@ def pull(
     skip_stocks: bool,
 ) -> None:
     """Pull 13F filings from SEC EDGAR."""
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     funds = load_funds(config)
 
     if not funds:
@@ -383,7 +400,7 @@ def pull(
 @click.pass_context
 def report(ctx: click.Context, fund_name: str, period: str, output: str | None) -> None:
     """Generate analysis report for a fund."""
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     funds = load_funds(config)
 
     # Find fund
@@ -419,7 +436,7 @@ def report(ctx: click.Context, fund_name: str, period: str, output: str | None) 
 @click.pass_context
 def compare(ctx: click.Context, fund_name: str, from_period: str, to_period: str) -> None:
     """Compare two periods for a fund."""
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     funds = load_funds(config)
 
     fund = next((f for f in funds if f.display_name.lower() == fund_name.lower()), None)
@@ -470,7 +487,7 @@ def universe_report(
     ctx: click.Context, funds: str, period: str, output: str | None
 ) -> None:
     """Generate cross-fund comparison report."""
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     all_funds = load_funds(config)
 
     # Parse fund names
@@ -522,7 +539,9 @@ def universe_report(
 @click.pass_context
 def lookup_cik(ctx: click.Context, name: str) -> None:
     """Look up CIK by company name (best-effort)."""
-    config = ctx.obj["config"]
+    # Note: This command doesn't actually need config currently,
+    # but we keep the pattern for consistency
+    _ = ctx  # unused
 
     click.echo(f"Searching for '{name}'...")
     click.echo(
@@ -538,7 +557,7 @@ def lookup_cik(ctx: click.Context, name: str) -> None:
 @click.pass_context
 def export(ctx: click.Context, fund_name: str, fmt: str, output: str | None) -> None:
     """Export fund data to CSV or Parquet."""
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     funds = load_funds(config)
 
     fund = next((f for f in funds if f.display_name.lower() == fund_name.lower()), None)
@@ -639,7 +658,7 @@ def check_new(ctx: click.Context, auto_pull: bool, send_notify: bool) -> None:
     from rich.console import Console
     from rich.table import Table
 
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     funds = load_funds(config)
 
     if not funds:
@@ -857,7 +876,7 @@ def stock(
         get_stock_quarters,
     )
 
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
 
     # Resolve query to CUSIP
     result = resolve_ticker_or_cusip(query, config)
@@ -969,7 +988,7 @@ def list_stocks(ctx: click.Context) -> None:
         format_bytes,
     )
 
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     stocks = load_tracked_stocks(config)
 
     if not stocks:
@@ -1021,7 +1040,7 @@ def add_stock_cmd(ctx: click.Context, ticker: str, cusip: str | None, name: str 
         format_bytes,
     )
 
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     ticker = ticker.upper()
 
     # Check if already tracked
@@ -1078,7 +1097,7 @@ def remove_stock_cmd(ctx: click.Context, ticker: str, yes: bool) -> None:
         format_bytes,
     )
 
-    config = ctx.obj["config"]
+    config = _get_lazy_config(ctx)
     ticker = ticker.upper()
 
     # Check if tracked
@@ -1106,8 +1125,26 @@ def remove_stock_cmd(ctx: click.Context, ticker: str, yes: bool) -> None:
 
 
 def main() -> None:
-    """Main entry point."""
-    cli(obj={})
+    """Main entry point with clean error handling."""
+    try:
+        cli(obj={})
+    except ValueError as e:
+        # Handle config errors (like missing SEC_CONTACT_EMAIL) cleanly
+        error_msg = str(e)
+        if "SEC_CONTACT_EMAIL" in error_msg:
+            click.echo("Error: SEC_CONTACT_EMAIL environment variable is required.", err=True)
+            click.echo("", err=True)
+            click.echo("SEC EDGAR requires a contact email in the User-Agent header.", err=True)
+            click.echo("Set it with: export SEC_CONTACT_EMAIL=your@email.com", err=True)
+            click.echo("", err=True)
+            click.echo("Add this line to your ~/.zshrc or ~/.bashrc to make it permanent.", err=True)
+        else:
+            click.echo(f"Error: {error_msg}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        # For unexpected errors, show a brief message
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
